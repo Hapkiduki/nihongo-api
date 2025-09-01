@@ -1,0 +1,10 @@
+server:
+  port: "3000"
+database:
+  mongo_uri: "mongodb://mongo:27017/nihongo"
+  redis_addr: "redis:6379"
+auth:
+  jwt_secret: "your-jwt-secret"
+revenuecat:
+  api_key: "your-revenuecat-api-key"
+  base_url: "https://api.revenuecat.com/v1"
