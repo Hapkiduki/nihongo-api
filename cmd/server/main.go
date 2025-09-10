@@ -1,52 +1,72 @@
 package main
 
 import (
-	"context"
-	"log"
 	"nihongo-api/internal/adapters/http/router"
 	"nihongo-api/internal/adapters/storage/mongo"
 	"nihongo-api/internal/application/service"
+	"nihongo-api/pkg/config"
 	"nihongo-api/pkg/database"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/spf13/viper"
+	"github.com/redis/go-redis/v9"
+	"github.com/rs/zerolog"
 )
 
 func main() {
+	// Initialize logger
+	logger := zerolog.New(os.Stdout).With().Timestamp().Logger()
+	if os.Getenv("APP_ENV") == "production" {
+		logger = logger.Level(zerolog.InfoLevel)
+	} else {
+		logger = logger.Level(zerolog.DebugLevel)
+	}
+
 	// Load configuration
-	viper.SetConfigName("config")
-	viper.SetConfigType("yml")
-	viper.AddConfigPath(".")
-	if err := viper.ReadInConfig(); err != nil {
-		log.Fatalf("Error reading config file: %v", err)
+	cfg, err := config.Load()
+	if err != nil {
+		logger.Fatal().Err(err).Msg("Failed to load config")
 	}
 
 	// Initialize database
-	db, err := database.ConnectMongo(viper.GetString("database.mongo_uri"))
+	db, err := database.ConnectMongo(cfg.Database.MongoURI)
 	if err != nil {
-		log.Fatalf("Failed to connect to MongoDB: %v", err)
+		logger.Fatal().Err(err).Msg("Failed to connect to MongoDB")
 	}
 	defer func() {
-		if err := db.Client().Disconnect(context.Background()); err != nil {
-			log.Printf("Error disconnecting from MongoDB: %v", err)
+		if err := database.CloseMongo(db.Client()); err != nil {
+			logger.Error().Err(err).Msg("Error disconnecting from MongoDB")
+		}
+	}()
+
+	// Initialize Redis
+	rdb := redis.NewClient(&redis.Options{
+		Addr: cfg.Database.RedisAddr,
+	})
+	defer func() {
+		if err := rdb.Close(); err != nil {
+			logger.Error().Err(err).Msg("Error closing Redis connection")
 		}
 	}()
 
 	// Initialize repositories
 	userRepo := mongo.NewMongoUserRepository(db)
 	syllableRepo := mongo.NewMongoSyllableRepository(db)
+	courseRepo := mongo.NewMongoCourseRepository(db)
+	kanjiRepo := mongo.NewMongoKanjiRepository(db)
+	progressRepo := mongo.NewMongoProgressRepository(db)
 
 	// Initialize services
 	userService := service.NewUserService(userRepo)
-	courseService := service.NewCourseService(nil)     // TODO: implement course repo
-	progressService := service.NewProgressService(nil) // TODO: implement progress repo
+	courseService := service.NewCourseService(courseRepo)
+	progressService := service.NewProgressService(progressRepo)
 
 	// Initialize Fiber app
 	app := fiber.New(fiber.Config{
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			logger.Error().Err(err).Str("path", c.Path()).Msg("Request error")
 			return c.Status(500).JSON(fiber.Map{
 				"error": err.Error(),
 			})
@@ -54,14 +74,13 @@ func main() {
 	})
 
 	// Setup routes
-	router.SetupRoutes(app, userService, courseService, progressService, syllableRepo)
+	router.SetupRoutes(app, userService, courseService, progressService, syllableRepo, kanjiRepo, cfg.Auth.JWTSecret)
 
 	// Start server
-	port := viper.GetString("server.port")
 	go func() {
-		log.Printf("Server starting on port %s", port)
-		if err := app.Listen(":" + port); err != nil {
-			log.Printf("Server error: %v", err)
+		logger.Info().Str("port", cfg.Server.Port).Msg("Server starting")
+		if err := app.Listen(":" + cfg.Server.Port); err != nil {
+			logger.Error().Err(err).Msg("Server error")
 		}
 	}()
 
@@ -69,11 +88,11 @@ func main() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	<-c
-	log.Println("Shutting down server...")
+	logger.Info().Msg("Shutting down server...")
 
 	if err := app.Shutdown(); err != nil {
-		log.Printf("Server shutdown error: %v", err)
+		logger.Error().Err(err).Msg("Server shutdown error")
 	}
 
-	log.Println("Server stopped")
+	logger.Info().Msg("Server stopped")
 }

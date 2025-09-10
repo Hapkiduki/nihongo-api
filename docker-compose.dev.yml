@@ -1,0 +1,44 @@
+# Docker Compose configuration for development environment
+# This file extends the base docker-compose.yml for local development.
+# It includes volume mounts for hot-reload of the application code.
+
+version: "3.8"
+
+services:
+  # Application service (Go/Fiber)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "3000:3000"
+    volumes:
+      - .:/app # Mount source code for hot-reload during development
+    env_file:
+      - .env.dev
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  # MongoDB database service
+  mongo:
+    image: mongo:6.0
+    ports:
+      - "27017:27017" # Exposed for local development tools
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+
+  # Redis cache service
+  redis:
+    image: redis:7.0-alpine
+    ports:
+      - "6379:6379" # Exposed for local development tools
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+
+volumes:
+  mongo-data:
+  redis-data:

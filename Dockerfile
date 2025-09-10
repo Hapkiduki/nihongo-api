@@ -1,5 +1,5 @@
 # --- Etapa 1: Builder ---
-FROM golang:1.21-alpine AS builder
+FROM golang:1.25.1-alpine AS builder
 
 WORKDIR /app
 
@@ -21,8 +21,6 @@ WORKDIR /
 # Copia el binario compilado
 COPY --from=builder /app/app .
 
-# Copia archivos de configuración
-COPY config.yml .
 
 # Expone el puerto
 EXPOSE 3000

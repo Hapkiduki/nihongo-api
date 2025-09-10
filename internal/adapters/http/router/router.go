@@ -2,17 +2,17 @@ package router
 
 import (
 	"nihongo-api/internal/application/service"
+	"nihongo-api/internal/domain"
 	"nihongo-api/internal/ports"
 	"time"
 
 	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/spf13/viper"
 )
 
 // SetupRoutes configures all HTTP routes
-func SetupRoutes(app *fiber.App, userService *service.UserService, courseService *service.CourseService, progressService *service.ProgressService, syllableRepo ports.SyllableRepository) {
+func SetupRoutes(app *fiber.App, userService *service.UserService, courseService *service.CourseService, progressService *service.ProgressService, syllableRepo ports.SyllableRepository, kanjiRepo ports.KanjiRepository, jwtSecret string) {
 	api := app.Group("/api")
 
 	// Health check
@@ -37,6 +37,34 @@ func SetupRoutes(app *fiber.App, userService *service.UserService, courseService
 			return c.Status(404).JSON(fiber.Map{"error": "Syllable not found"})
 		}
 		return c.JSON(syllable)
+	})
+
+	// Kanji routes
+	kanji := api.Group("/kanji")
+	kanji.Get("/", func(c *fiber.Ctx) error {
+		kanjiList, err := kanjiRepo.GetAll(c.Context())
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(kanjiList)
+	})
+
+	kanji.Get("/:id", func(c *fiber.Ctx) error {
+		id := c.Params("id")
+		kanji, err := kanjiRepo.GetByID(c.Context(), id)
+		if err != nil {
+			return c.Status(404).JSON(fiber.Map{"error": "Kanji not found"})
+		}
+		return c.JSON(kanji)
+	})
+
+	kanji.Get("/level/:level", func(c *fiber.Ctx) error {
+		level := c.Params("level")
+		kanjiList, err := kanjiRepo.GetByLevel(c.Context(), domain.JLPTLevel(level))
+		if err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		}
+		return c.JSON(kanjiList)
 	})
 
 	// Auth routes
@@ -82,7 +110,6 @@ func SetupRoutes(app *fiber.App, userService *service.UserService, courseService
 		claims["email"] = user.Email
 		claims["exp"] = time.Now().Add(time.Hour * 72).Unix()
 
-		jwtSecret := viper.GetString("auth.jwt_secret")
 		t, err := token.SignedString([]byte(jwtSecret))
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Failed to generate token"})
@@ -92,7 +119,6 @@ func SetupRoutes(app *fiber.App, userService *service.UserService, courseService
 	})
 
 	// JWT middleware
-	jwtSecret := viper.GetString("auth.jwt_secret")
 	jwtMiddleware := jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: []byte(jwtSecret)},
 	})

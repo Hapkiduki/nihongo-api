@@ -1,0 +1,40 @@
+# Docker Compose configuration for production environment
+# This file is optimized for production deployment.
+# It does not expose internal service ports and uses secure settings.
+
+version: "3.8"
+
+services:
+  # Application service (Go/Fiber)
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000" # Only expose the app port; internal services not exposed
+    env_file:
+      - .env.prod
+    depends_on:
+      - mongo
+      - redis
+    restart: unless-stopped
+
+  # MongoDB database service
+  mongo:
+    image: mongo:6.0
+    volumes:
+      - mongo-data:/data/db
+    restart: unless-stopped
+    # No ports exposed for security in production
+
+  # Redis cache service
+  redis:
+    image: redis:7.0-alpine
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    # No ports exposed for security in production
+
+volumes:
+  mongo-data:
+  redis-data:

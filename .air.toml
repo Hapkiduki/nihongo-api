@@ -1,0 +1,89 @@
+# .air.toml configuration for Air live-reload in the Go Nihongo API project
+# Based on official documentation: https://github.com/air-verse/air#configuration
+
+root = "."
+
+[build]
+  # Command to build the binary (adjust for your main entrypoint in ./cmd/server)
+  cmd = "go build -o ./tmp/app ./cmd/server"
+  # Binary to execute after build
+  bin = "./tmp/app"
+  # Delay after each build before starting (in seconds)
+  delay = 1
+  # Stop the binary before rebuilding
+  stop_cmd = "pkill -SIGTERM -f ./tmp/app || exit 0"
+  # Do not execute the binary if build fails
+  no_bin = true
+  # Full rebuild on changes (empty string means incremental)
+  full_bin = ""
+  # Binary arguments (empty for no args)
+  args_bin = []
+
+[log]
+  # Log send to main.log and send errors to main.error.log
+  main_only = false
+  # Log time format (ISO 8601 by default)
+  time = true
+  # Log file name
+  send_log_file = "main.log"
+  # Log errors file name
+  send_error_log_file = "main.error.log"
+  # Log colors enabled (true by default)
+  colors = true
+  # Log level (debug by default)
+  log_level = "debug"
+
+[misc]
+  # Clean old files on restart
+  clean_on_exit = true
+
+[screen]
+  # Clear screen on each rebuild
+  clear_on_rebuild = true
+  # Show build errors in the same screen
+  keep_errors = false
+  # Show source file path in the error message
+  status_msg_prefix = "status:"
+  # Show error prefix in the error message
+  error_msg_prefix = "error:"
+  # Show warnings prefix in the warning message
+  warn_msg_prefix = "warning:"
+
+[mock]
+  # Mock generation command (empty for no mock)
+  cmd = "mockgen -source=./internal/ports/user_repository.go -destination=./internal/mocks/user_repository_mock.go -package=mocks"
+
+[post_build]
+  # Commands to run after each build
+  cmd = []
+
+[proxy]
+  # Enable proxy for browser reload on static changes (optional, disabled by default)
+  enabled = false
+  # Proxy port (default 0 for random)
+  proxy_port = 0
+  # App port
+  app_port = 3000
+
+[include_ext]
+  # File extensions to monitor for changes
+  include_ext = ["go", "toml", "yaml", "yml", "json", "html", "css", "js", "ts"]
+
+[exclude_dir]
+  # Directories to exclude from monitoring
+  exclude_dir = ["tmp", "vendor", "assets"]
+
+[include_dir]
+  # Directories to include (all by default)
+
+[include_file]
+  # Specific files to include (none by default)
+
+[exclude_file]
+  # Specific files to exclude (none by default)
+
+[exclude_regex]
+  # Regex to exclude files (none by default)
+
+[include_regex]
+  # Regex to include files (none by default)

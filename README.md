@@ -12,24 +12,43 @@ A production-ready REST API for Japanese language learning built with Go, Fiber,
 - **Premium Content**: RevenueCat integration for subscription-based premium courses
 - **Clean Architecture**: Modular, testable, and maintainable codebase
 - **Docker Support**: Containerized deployment with multi-stage builds
+- **Structured Logging**: Zerolog for consistent, structured logging
+- **Input Validation**: Comprehensive validation using go-playground/validator
+- **Error Handling**: Consistent error wrapping and handling across all layers
+- **Configuration Management**: Viper-based configuration with environment variable support
 
 ## 🏗️ Architecture
 
-This project follows Clean Architecture principles with the following structure:
+This project follows Clean Architecture principles with SOLID design patterns, Repository Pattern, and Modular Monolith approach. The structure ensures separation of concerns, testability, and maintainability.
 
 ```
 ├── cmd/server/          # Application entry point
 ├── internal/
-│   ├── domain/          # Business entities (User, Kanji, Course, etc.)
+│   ├── domain/          # Business entities with validation (User, Kanji, Course, etc.)
 │   ├── application/     # Use cases and business logic
-│   │   └── service/     # Application services
-│   ├── ports/           # Interfaces (Repository contracts)
+│   │   └── service/     # Application services with dependency injection
+│   ├── ports/           # Interfaces (Repository contracts - Dependency Inversion)
 │   └── adapters/        # External concerns implementations
-│       ├── http/        # HTTP handlers and routing
-│       └── storage/     # Database implementations
-├── pkg/                 # Shared packages (database, logger)
-└── config/              # Configuration files
+│       ├── http/        # HTTP handlers and routing with JWT middleware
+│       └── storage/     # Database implementations (MongoDB)
+├── pkg/                 # Shared packages
+│   ├── config/          # Configuration management with Viper
+│   └── database/        # Database connection utilities
+└── config.yml           # Default configuration file
 ```
+
+### Design Patterns Implemented
+
+- **Clean Architecture**: Clear separation between domain, application, and infrastructure layers
+- **Repository Pattern**: Abstract data access through interfaces
+- **Dependency Injection**: Services receive dependencies through interfaces
+- **SOLID Principles**:
+  - **S**ingle Responsibility: Each component has one reason to change
+  - **O**pen/Closed: Open for extension, closed for modification
+  - **L**iskov Substitution: Implementations can be substituted for interfaces
+  - **I**nterface Segregation: Specific interfaces for different clients
+  - **D**ependency Inversion: Depend on abstractions, not concretions
+- **Modular Monolith**: Organized modules within a single deployable unit
 
 ## 📋 Prerequisites
 
@@ -146,6 +165,56 @@ The application uses Viper for configuration management. Key configuration optio
 | `JWT_SECRET`         | JWT signing secret        | Required                        |
 | `REVENUECAT_API_KEY` | RevenueCat API key        | Required                        |
 
+## Nueva Configuración con Viper
+
+La aplicación ahora usa un sistema de configuración híbrido con Viper para mayor seguridad y flexibilidad.
+
+### Flujo de Configuración
+
+Viper prioriza las fuentes en este orden:
+
+1. Variables de entorno (e.g., `APP_SERVER_PORT=3000`)
+2. Archivo .env (gitignore, para secrets locales)
+3. config.yml (defaults no sensibles en repo)
+
+### Setup
+
+1. Copia `.env.example` a `.env.dev` para dev o `.env.prod` para prod, y edita secrets (e.g., `APP_AUTH_JWT_SECRET=your-secret`).
+2. Para dev: `docker-compose -f docker-compose.dev.yml up` (carga .env.dev).
+3. Para prod: `docker-compose -f docker-compose.prod.yml up` (carga .env.prod).
+4. Validación: La struct Config valida required fields y formatos (e.g., URL para base_url).
+
+### Variables Clave
+
+| Variable                  | Descripción                    | Ejemplo Default                   |
+| ------------------------- | ------------------------------ | --------------------------------- |
+| `APP_SERVER_PORT`         | Puerto del servidor HTTP       | 3000                              |
+| `APP_DATABASE_MONGO_URI`  | URI de MongoDB                 | mongodb://localhost:27017/nihongo |
+| `APP_DATABASE_REDIS_ADDR` | Dirección de Redis             | localhost:6379                    |
+| `APP_AUTH_JWT_SECRET`     | Secret para JWT (min 32 chars) | your-secret-here                  |
+| `APP_REVENUECAT_API_KEY`  | API key de RevenueCat          | your-key-here                     |
+| `APP_REVENUECAT_BASE_URL` | Base URL de RevenueCat         | https://api.revenuecat.com/v1     |
+
+Nunca commitees .env o secrets. Para Docker, env vars se inyectan via env_file.
+
+## Despliegue a Fly.io
+
+Fly.io es una plataforma para desplegar apps Go/Docker fácilmente.
+
+### Pasos
+
+1. Instala flyctl: `brew install flyctl` (macOS) o descarga desde fly.io/docs/hq/install.
+2. `fly auth login`.
+3. `fly launch`: Genera fly.toml basado en Dockerfile.
+4. Edita fly.toml: Agrega [env] para defaults no secrets (e.g., APP_SERVER_PORT = "3000").
+5. Set secrets: `fly secrets set APP_AUTH_JWT_SECRET=your-secret APP_REVENUECAT_API_KEY=your-key`.
+6. Para DB: `fly postgres create` para Mongo-like (o usa external), set URI como secret.
+7. `fly deploy`: Build y deploy desde Dockerfile.
+8. Accede: `fly open`, monitorea `fly logs`.
+9. Escala: `fly scale count 2`.
+
+Viper leerá env vars de Fly. Compatible con el nuevo sistema de config.
+
 ## 🧪 Testing
 
 ```bash
@@ -183,13 +252,28 @@ docker-compose up --build
 - **Ports Layer**: Defines interfaces for external dependencies
 - **Adapters Layer**: Implements external concerns (HTTP, database)
 
+### Go Best Practices Implemented
+
+Following the latest Go team's recommendations (as of September 2025):
+
+- **Error Handling**: Consistent error wrapping with `fmt.Errorf` and error chains
+- **Context Usage**: Proper context propagation throughout the application
+- **Structured Logging**: Zerolog for performance and structured output
+- **Configuration**: Viper for flexible configuration management
+- **Validation**: Input validation using struct tags and validator library
+- **Dependency Injection**: Clean dependency management through interfaces
+- **Graceful Shutdown**: Proper cleanup of resources (database, Redis connections)
+- **Modular Design**: Clear separation of concerns with internal package organization
+
 ### Adding New Features
 
-1. Define domain entities in `internal/domain/`
+1. Define domain entities in `internal/domain/` with validation tags
 2. Create repository interfaces in `internal/ports/`
 3. Implement business logic in `internal/application/service/`
 4. Create HTTP handlers in `internal/adapters/http/`
 5. Update routing in `internal/adapters/http/router/`
+6. Add structured logging where appropriate
+7. Ensure proper error handling and context usage
 
 ## 🤝 Contributing
 

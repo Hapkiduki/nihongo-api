@@ -29,3 +29,11 @@ func ConnectMongo(uri string) (*mongo.Database, error) {
 	// Return the database (assuming database name is "nihongo")
 	return client.Database("nihongo"), nil
 }
+
+// CloseMongo closes the MongoDB connection
+func CloseMongo(client *mongo.Client) error {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	return client.Disconnect(ctx)
+}
