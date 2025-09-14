@@ -1,15 +1,15 @@
 package mongo
 
 import (
-"context"
-"errors"
-"fmt"
-"nihongo-api/internal/domain"
-"nihongo-api/internal/ports"
+	"context"
+	"errors"
+	"fmt"
+	"nihongo-api/internal/domain"
+	"nihongo-api/internal/ports"
 
-"go.mongodb.org/mongo-driver/bson"
-"go.mongodb.org/mongo-driver/bson/primitive"
-"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type mongoProgressRepository struct {
@@ -80,10 +80,10 @@ func (r *mongoProgressRepository) GetByUserAndEntity(ctx context.Context, userID
 
 	var progress domain.Progress
 	err = r.collection.FindOne(ctx, bson.M{
-"user_id":     userObjID,
-"entity_id":   entityObjID,
-"entity_type": entityType,
-}).Decode(&progress)
+		"user_id":     userObjID,
+		"entity_id":   entityObjID,
+		"entity_type": entityType,
+	}).Decode(&progress)
 	if err != nil {
 		if errors.Is(err, mongo.ErrNoDocuments) {
 			return nil, errors.New("progress not found")
@@ -95,10 +95,10 @@ func (r *mongoProgressRepository) GetByUserAndEntity(ctx context.Context, userID
 
 func (r *mongoProgressRepository) Update(ctx context.Context, progress *domain.Progress) error {
 	_, err := r.collection.UpdateOne(
-ctx,
-bson.M{"_id": progress.ID},
-bson.M{"$set": progress},
-)
+		ctx,
+		bson.M{"_id": progress.ID},
+		bson.M{"$set": progress},
+	)
 	if err != nil {
 		return fmt.Errorf("failed to update progress: %w", err)
 	}

@@ -8,6 +8,7 @@ import (
 	"nihongo-api/pkg/database"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/gofiber/fiber/v2"
@@ -53,13 +54,15 @@ func main() {
 
 	// Initialize repositories
 	userRepo := mongo.NewMongoUserRepository(db)
+	subRepo := mongo.NewMongoSubscriptionRepository(db)
 	syllableRepo := mongo.NewMongoSyllableRepository(db)
 	courseRepo := mongo.NewMongoCourseRepository(db)
 	kanjiRepo := mongo.NewMongoKanjiRepository(db)
 	progressRepo := mongo.NewMongoProgressRepository(db)
 
 	// Initialize services
-	userService := service.NewUserService(userRepo)
+	userService := service.NewUserService(userRepo, subRepo, logger)
+	subscriptionService := service.NewSubscriptionService(subRepo, userRepo, userService, logger)
 	courseService := service.NewCourseService(courseRepo)
 	progressService := service.NewProgressService(progressRepo)
 
@@ -74,7 +77,30 @@ func main() {
 	})
 
 	// Setup routes
-	router.SetupRoutes(app, userService, courseService, progressService, syllableRepo, kanjiRepo, cfg.Auth.JWTSecret)
+	// Prefer config revenuecat.webhook_secrets (comma-separated) but fall back to env var
+	webhookSecrets := []string{}
+	if cfg.RevenueCat.WebhookSecrets != "" {
+		for _, s := range strings.Split(cfg.RevenueCat.WebhookSecrets, ",") {
+			ss := strings.TrimSpace(s)
+			if ss != "" {
+				webhookSecrets = append(webhookSecrets, ss)
+			}
+		}
+	} else {
+		envSecret := os.Getenv("APP_REVENUECAT_WEBHOOK_SECRET")
+		if envSecret != "" {
+			for _, s := range strings.Split(envSecret, ",") {
+				ss := strings.TrimSpace(s)
+				if ss != "" {
+					webhookSecrets = append(webhookSecrets, ss)
+				}
+			}
+		}
+	}
+	if len(webhookSecrets) == 0 {
+		logger.Fatal().Msg("APP_REVENUECAT_WEBHOOK_SECRET(s) required")
+	}
+	router.SetupRoutes(app, userService, subscriptionService, courseService, progressService, syllableRepo, kanjiRepo, cfg.Auth.JWTSecret, webhookSecrets, logger)
 
 	// Start server
 	go func() {

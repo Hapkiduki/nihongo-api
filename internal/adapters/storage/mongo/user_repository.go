@@ -5,6 +5,7 @@ import (
 	"errors"
 	"nihongo-api/internal/domain"
 	"nihongo-api/internal/ports"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -21,6 +22,45 @@ func NewMongoUserRepository(db *mongo.Database) ports.UserRepository {
 	return &mongoUserRepository{
 		collection: db.Collection("users"),
 	}
+}
+
+// LinkRevenueCatUserID links a RevenueCat user ID to an internal user
+func (r *mongoUserRepository) LinkRevenueCatUserID(ctx context.Context, userID, revenueCatUserID string) error {
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return err
+	}
+
+	update := bson.M{
+		"$set": bson.M{
+			"revenue_cat_user_id": revenueCatUserID,
+			"updated_at":          time.Now(),
+		},
+	}
+
+	result, err := r.collection.UpdateOne(ctx, bson.M{"_id": objID}, update)
+	if err != nil {
+		return err
+	}
+
+	if result.ModifiedCount == 0 {
+		return errors.New("user not found or no update needed")
+	}
+
+	return nil
+}
+
+// GetByRevenueCatID retrieves a user by RevenueCat user ID
+func (r *mongoUserRepository) GetByRevenueCatID(ctx context.Context, revenueCatID string) (*domain.User, error) {
+	var user domain.User
+	err := r.collection.FindOne(ctx, bson.M{"revenue_cat_user_id": revenueCatID}).Decode(&user)
+	if err != nil {
+		if errors.Is(err, mongo.ErrNoDocuments) {
+			return nil, errors.New("user not found")
+		}
+		return nil, err
+	}
+	return &user, nil
 }
 
 func (r *mongoUserRepository) Create(ctx context.Context, user *domain.User) error {

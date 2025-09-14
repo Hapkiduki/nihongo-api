@@ -12,4 +12,6 @@ type UserRepository interface {
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	Update(ctx context.Context, user *domain.User) error
 	Delete(ctx context.Context, id string) error
+	LinkRevenueCatUserID(ctx context.Context, userID, revenueCatUserID string) error
+	GetByRevenueCatID(ctx context.Context, revenueCatID string) (*domain.User, error)
 }

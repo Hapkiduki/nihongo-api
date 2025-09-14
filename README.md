@@ -297,3 +297,39 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 Made with ❤️ for Japanese language learners worldwide
+
+## RevenueCat Webhook: secret rotation & best practices
+
+This project integrates RevenueCat webhooks for subscription events. Follow these guidelines to keep webhook handling secure and reliable:
+
+- Secret rotation
+
+  - Store webhook secrets outside the repository (use environment variables or a secrets manager).
+  - The application supports multiple comma-separated webhook secrets (`APP_REVENUECAT_WEBHOOK_SECRET` or `revenuecat.webhook_secrets` in `config.yml`) to allow rolling rotations: add the new secret alongside the old one, deploy, then remove the old secret after verification.
+
+- Verification
+
+  - Webhook signature verification uses HMAC-SHA256 on the raw request body and constant-time comparison.
+  - The code verifies against all configured secrets to support rotation.
+
+- Error handling and retries
+
+  - Return 401 for missing/invalid signatures.
+  - Return 5xx for transient server errors (database/network) so RevenueCat can retry.
+  - Treat duplicate-event DB errors as idempotent and respond 200 to prevent duplicate processing.
+
+- Operational best practices
+
+  - Limit request body size and validate Content-Type to avoid resource exhaustion.
+  - Redact PII (emails, names) from logs. Log event IDs and non-sensitive metadata for correlation.
+  - Add metrics for signature failures and processing errors to detect attacks or misconfiguration.
+  - Consider enqueueing heavy processing into a background worker for low-latency responses.
+  - Use HTTPS and a WAF when possible; consider IP allowlisting if RevenueCat publishes IP ranges.
+
+- Local testing
+  - Use the test utilities and Unit tests included in `internal/adapters/http/webhook`.
+  - For local development, set `APP_REVENUECAT_WEBHOOK_SECRET` in `.env.dev` and use a tool (curl/postman) to send signed requests.
+
+Para detalles más extensos, pasos con ngrok y configuración por ambientes (dev/sandbox vs prod), consulta la guía completa en `docs/revenuecat-webhook.md`.
+
+Following these patterns keeps the webhook integration secure, testable, and operationally robust.

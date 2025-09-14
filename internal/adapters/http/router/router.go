@@ -1,6 +1,8 @@
 package router
 
 import (
+	"nihongo-api/internal/adapters/http/middleware"
+	"nihongo-api/internal/adapters/http/webhook"
 	"nihongo-api/internal/application/service"
 	"nihongo-api/internal/domain"
 	"nihongo-api/internal/ports"
@@ -9,10 +11,11 @@ import (
 	jwtware "github.com/gofiber/contrib/jwt"
 	"github.com/gofiber/fiber/v2"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rs/zerolog"
 )
 
 // SetupRoutes configures all HTTP routes
-func SetupRoutes(app *fiber.App, userService *service.UserService, courseService *service.CourseService, progressService *service.ProgressService, syllableRepo ports.SyllableRepository, kanjiRepo ports.KanjiRepository, jwtSecret string) {
+func SetupRoutes(app *fiber.App, userService *service.UserService, subscriptionService *service.SubscriptionService, courseService *service.CourseService, progressService *service.ProgressService, syllableRepo ports.SyllableRepository, kanjiRepo ports.KanjiRepository, jwtSecret string, revenueCatSecrets []string, logger zerolog.Logger) {
 	api := app.Group("/api")
 
 	// Health check
@@ -145,4 +148,13 @@ func SetupRoutes(app *fiber.App, userService *service.UserService, courseService
 
 		return c.JSON(userData)
 	})
+	// Webhook routes (no auth needed)
+	webhooks := app.Group("/webhooks")
+
+	// Apply security middlewares to webhooks
+	rateLimiter := middleware.NewInMemoryRateLimiter(10, time.Minute) // 10 requests per minute per IP
+	webhooks.Use(middleware.WebhookBodyLimit(), rateLimiter.Handler())
+
+	revenueCatHandler := webhook.NewRevenueCatHandler(subscriptionService, revenueCatSecrets, logger)
+	webhooks.Post("/revenuecat", revenueCatHandler.Handle)
 }

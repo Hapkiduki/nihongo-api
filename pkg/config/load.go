@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/go-playground/validator/v10"
+	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
 )
 
@@ -38,10 +39,35 @@ type AuthConfig struct {
 type RevenueCatConfig struct {
 	APIKey  string `mapstructure:"api_key" validate:"required"`
 	BaseURL string `mapstructure:"base_url" validate:"required,url"`
+	// WebhookSecrets is a comma-separated list of accepted webhook secrets for rotation
+	WebhookSecrets string `mapstructure:"webhook_secrets" validate:"required"`
 }
 
 // Load loads and validates the configuration
 func Load() (*Config, error) {
+	// Load environment-specific .env file
+	env := os.Getenv("APP_ENV")
+	if env == "" {
+		env = "development"
+	}
+	envFile := ".env." + env
+	if _, err := os.Stat(envFile); err == nil {
+		if err := godotenv.Load(envFile); err != nil {
+			return nil, fmt.Errorf("error loading %s: %w", envFile, err)
+		}
+		log.Printf("Loaded environment file: %s", envFile)
+	} else {
+		// Fallback to .env
+		if _, err := os.Stat(".env"); err == nil {
+			if err := godotenv.Load(".env"); err != nil {
+				return nil, fmt.Errorf("error loading .env: %w", err)
+			}
+			log.Println("Loaded fallback .env")
+		} else {
+			log.Println("No .env file found, using system env vars")
+		}
+	}
+
 	v := viper.New()
 
 	// Set environment prefix and automatic env binding
@@ -50,16 +76,7 @@ func Load() (*Config, error) {
 	// Replace dots and underscores in env keys for nested configs
 	v.SetEnvKeyReplacer(strings.NewReplacer(".", "_", "-", "_"))
 
-	// Try to load .env file if it exists
-	envFile := ".env"
-	if _, err := os.Stat(envFile); err == nil {
-		v.SetConfigFile(envFile)
-		if err := v.ReadInConfig(); err != nil {
-			return nil, fmt.Errorf("error reading .env file: %w", err)
-		}
-	}
-
-	// Load config.yml as fallback for defaults
+	// Load config.yml as fallback for defaults (only non-sensitive)
 	v.SetConfigName("config")
 	v.SetConfigType("yml")
 	v.AddConfigPath(".")
